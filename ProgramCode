@@ -1,0 +1,108 @@
+import folium
+from folium import plugins
+import pandas as pd
+import ipywidgets
+import os
+import json
+import datetime
+
+UMMlocation = (49.49216583285166, 8.484229445457458)
+map_UMM = folium.Map(location=UMMlocation, width="75%", zoom_start=17)
+map_UMM
+
+startTime = int(datetime.timedelta(minutes=6, seconds=30).total_seconds())
+hauseOutline = 'HospitalNavigator/GeoResources/Haus22.geojson'
+folium.GeoJson(hauseOutline, name="Haus22").add_to(map_UMM)
+map_UMM
+
+testGeoJson = 'HospitalNavigator/GeoResources/path/w17.geojson'
+
+def switchPosition(coordinate):
+    temp = coordinate[0]
+    coordinate[0] = coordinate[1]
+    coordinate[1] = temp
+    return coordinate
+
+with open(testGeoJson) as f:
+    testWay = json.load(f)
+    
+for feature in testWay['features']:
+    path = feature['geometry']['coordinates']
+    finalPath = list(map(switchPosition, path))
+    
+folium.plugins.AntPath([[49.49213534374249, 8.484166413545609],
+                        [49.49232786037041, 8.484299182891846],
+                        [49.49233047371309, 8.484493643045425],
+                        [49.492218099851804, 8.484871834516525],
+                        [49.49142363542676, 8.487555384635925],
+                        [49.49185222967887, 8.487834334373474],
+                        [49.491712849846046, 8.488343954086304],
+                        [49.492029938390125, 8.488638997077942],
+                        [49.49251776290861, 8.488982319831848],
+                        [49.49222506878094, 8.489341735839844],
+                        [49.49217977072383, 8.489529490470886],
+                        [49.49220764645621, 8.489856719970703]]).add_to(map_UMM)
+map_UMM
+
+class navigator:
+    def __init__(self):
+        self.geoResources = {}
+        self.hospitalLocation = (49.49226339787344, 8.487303256988524)
+        self.position = 'w'
+        self.destination = 'Haus17'
+        for root, dirs, files in os.walk('HospitalNavigator/GeoResources'):
+            for file in files:
+                self.geoResources[file.split('.')[0]] = root + '/' + file
+
+    def changeDestination(self, newDestination):
+        self.destination = newDestination
+        self.redrawMap()
+
+    def changeStartPoint(self, newStartPoint):
+        print(f'Selected Start: {newStartPoint}; Selected Target: {self.destination}')
+
+    def drawPathWay(self, hospitalMap):
+        searchString = self.position + self.destination.split('Haus')[1]
+        with open(self.geoResources[searchString]) as f:
+            testWay = json.load(f)
+        for feature in testWay['features']:
+            path = feature['geometry']['coordinates']
+            finalPath = list(map(switchPosition, path))
+            folium.plugins.AntPath(finalPath).add_to(hospitalMap)
+
+    def drawBuilding(self, hospitalMap):
+        hauseOutline = self.geoResources[self.destination]
+        folium.GeoJson(hauseOutline, name="geojson").add_to(hospitalMap)
+
+    def redrawMap(self):
+        hospitalMap = folium.Map(location=self.hospitalLocation, width="75%", zoom_start=17)
+        self.drawPathWay(hospitalMap)
+        self.drawBuilding(hospitalMap)
+        display(hospitalMap)
+
+myNavigator = navigator()
+
+def displayWay(whereTo):
+    myNavigator.changeDestination(whereTo)
+
+def changePosition(whereFrom):
+    myNavigator.changeStartPoint(whereFrom)
+
+selectPosition_widget = ipywidgets.Select(
+    options=['Aufnahme', 'Eingang West', 'Eingang Ost', 'Eingang Fahrzeuge'],
+    value='Eingang West',
+    description='Start',
+    disabled=False
+)
+
+def selectPosition(position):
+    if position == 'Aufnahme':
+        changePosition('a')
+    if position == 'Eingang West':
+        changePosition('w')
+    if position == 'Eingang Ost':
+        changePosition('o')
+    if position == 'Eingang Fahrzeuge':
+        changePosition('f')
+
+ipywidgets.interact(selectPosition, position=selectPosition_widget)
